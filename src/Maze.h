@@ -120,6 +120,7 @@ class Maze {
 
 		float*	LookAt(void);
 		float*	Perspective(const float wOverh);
+		void    NDC(float[4][4], const float*, const float*, const float*, const float*, const float*);
 
 	private:
 		Cell				*view_cell;// The cell that currently contains the view

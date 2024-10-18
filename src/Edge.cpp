@@ -22,7 +22,7 @@
 
 const char  Edge::LEFT		= 0;
 const char  Edge::RIGHT		= 1;
-const char  Edge::ON			= 2;
+const char  Edge::ON		= 2;
 const char  Edge::NEITHER	= 3;
 
 const char  Edge::START		= 0;

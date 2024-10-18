@@ -531,6 +531,43 @@ float* Maze::Perspective(const float wOverh)
 	return perspective;
 }
 
+void Maze::NDC(float edge[4][4], const float start[2], const float end[2], const float color[3], const float modelView[16], const float projection[16])
+{
+	float tmp[4][4] = { 0.0f };
+
+	for (int i = 0; i <= 3; i++) {
+		for (int j = 0; j <= 3; j++) {
+			for (int k = 0; k <= 3; k++) {
+				tmp[k][i] += edge[k][j] * modelView[j * 4 + i];
+			}
+		}
+	}
+	for (int i = 0; i <= 3; i++) {
+		for (int k = 0; k <= 3; k++) {
+			edge[k][i] = tmp[k][i];
+		}
+	}
+
+	for (int i = 0; i <= 3; i++) {
+		for (int j = 0; j <= 3; j++) {
+			for (int k = 0; k <= 3; k++) {
+				tmp[k][i] += edge[k][j] * projection[j * 4 + i];
+			}
+		}
+	}
+	for (int i = 0; i <= 3; i++) {
+		for (int k = 0; k <= 3; k++) {
+			edge[k][i] = tmp[k][i];
+		}
+	}
+
+	for (int i = 0; i <= 2; i++) {
+		for (int k = 0; k <= 3; k++) {
+			edge[k][i] /= edge[k][3];
+		}
+	}
+}
+
 //**********************************************************************
 //
 // * Move the viewer's position. This method will do collision detection
@@ -722,85 +759,31 @@ Draw_View(const float focal_dist, const float aspect)
 void Maze::
 Draw_Wall(const float start[2], const float end[2], const float color[3], const float modelView[16], const float projection[16])
 {
-	float edge0[4] = { start[Y], 1.0f, start[X], 1.0f };
-	float edge1[4] = { end[Y], 1.0f, end[X], 1.0f };
-	float edge2[4] = { end[Y], -1.0f, end[X], 1.0f };
-	float edge3[4] = { start[Y], -1.0f, start[X], 1.0f };
+	float edge[4][4] = {
+		{ start[Y], 1.0f, start[X], 1.0f },
+		{ end[Y], 1.0f, end[X], 1.0f },
+		{ end[Y], -1.0f, end[X], 1.0f },
+		{ start[Y], -1.0f, start[X], 1.0f }
+	};
+
+	NDC(edge, start, end, color, modelView, projection);
 	
-	float tmp0[4] = { 0.0f };
-	float tmp1[4] = { 0.0f };
-	float tmp2[4] = { 0.0f };
-	float tmp3[4] = { 0.0f };
 
-	for (int i = 0; i <= 3; i++) {
-		for (int j = 0; j <= 3; j++) {
-			tmp0[i] += edge0[j] * modelView[j * 4 + i];
-			tmp1[i] += edge1[j] * modelView[j * 4 + i];
-			tmp2[i] += edge2[j] * modelView[j * 4 + i];
-			tmp3[i] += edge3[j] * modelView[j * 4 + i];
-		}
-	}
-	for (int i = 0; i <= 3; i++)
-	{
-		edge0[i] = tmp0[i];
-		edge1[i] = tmp1[i];
-		edge2[i] = tmp2[i];
-		edge3[i] = tmp3[i];
-	}
 
-	for (int i = 0; i <= 3; i++) {
-		for (int j = 0; j <= 3; j++) {
-			tmp0[i] += edge0[j] * projection[j * 4 + i];
-			tmp1[i] += edge1[j] * projection[j * 4 + i];
-			tmp2[i] += edge2[j] * projection[j * 4 + i];
-			tmp3[i] += edge3[j] * projection[j * 4 + i];
-		}
-	}
-	for (int i = 0; i <= 3; i++)
-	{
-		edge0[i] = tmp0[i];
-		edge1[i] = tmp1[i];
-		edge2[i] = tmp2[i];
-		edge3[i] = tmp3[i];
-	}
 
-	for (int i = 0; i <= 2; i++)
-	{
-		edge0[i] /= edge0[3];
-		edge1[i] /= edge1[3];
-		edge2[i] /= edge2[3];
-		edge3[i] /= edge3[3];
-	}
+
 
 	glBegin(GL_POLYGON);
 	glColor3fv(color);
-	glVertex2f(edge0[X], edge0[Y]);
-	glVertex2f(edge1[X], edge1[Y]);
-	glVertex2f(edge2[X], edge2[Y]);
-	glVertex2f(edge3[X], edge3[Y]);	
+	glVertex2f(edge[0][X], edge[0][Y]);
+	glVertex2f(edge[1][X], edge[1][Y]);
+	glVertex2f(edge[2][X], edge[2][Y]);
+	glVertex2f(edge[3][X], edge[3][Y]);
 	glEnd();
 
 
 
 
-	// ModelViewProjection matrix, when manually multiply, is modelView * projection
-	// float mvp[16] = { 0.0f };
-	// for (int i = 0; i <= 3; i++) {
-	// 	for (int j = 0; j <= 3; j++) {
-	// 		mvp[i * 4 + j] = modelView[i * 4 + 0] * projection[0 + j] + modelView[i * 4 + 1] * projection[4 + j] + modelView[i * 4 + 2] * projection[8 + j] + modelView[i * 4 + 3] * projection[12 + j];
-	// 	}
-	// }
-	// glMultMatrixf(mvp);
-	// float edge0[3] = { start[Y], 0.0f, start[X] };
-	// float edge1[3] = { end[Y], 0.0f, end[X] };
-	// glBegin(GL_POLYGON);
-	// //glColor3f(0.0f, 1.0f, 0.0f);
-	// glColor3fv(color);
-	// glVertex3f(edge0[X], 1.0f, edge0[Z]);
-	// glVertex3f(edge1[X], 1.0f, edge1[Z]);
-	// glVertex3f(edge1[X], -1.0f, edge1[Z]);
-	// glVertex3f(edge0[X], -1.0f, edge0[Z]);
-	// glEnd();
 }
 
 
