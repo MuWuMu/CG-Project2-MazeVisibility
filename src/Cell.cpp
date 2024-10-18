@@ -20,7 +20,6 @@
 #include "LineSeg.h"
 #include <Fl/gl.h>
 #include <Fl/math.h>
-#include "Cell.h"
 
 const char  Cell::PLUS_X	= 0;
 const char  Cell::PLUS_Y	= 1;

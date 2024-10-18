@@ -120,17 +120,9 @@ draw(void)
 		// plus the focal length.
 
 		glClear(GL_DEPTH_BUFFER_BIT);
+		
 
-		//gluPerspective(maze->viewer_fov, (float)w() / h(), 0.01, 200);
-
-		//gluLookAt(
-		//	viewer_pos[Maze::X], viewer_pos[Maze::Y], viewer_pos[Maze::Z],
-		//	viewer_pos[Maze::X] + sin(Maze::To_Radians(maze->viewer_dir)),
-		//	viewer_pos[Maze::Y],
-		//	viewer_pos[Maze::Z] + cos(Maze::To_Radians(maze->viewer_dir)),
-		//	0.0f, 1.0f, 0.0f);
-
-		maze->Draw_View(focal_length, (float)w() / h());
+		maze->Draw_View((float)w() / h());
 	}
 }
 

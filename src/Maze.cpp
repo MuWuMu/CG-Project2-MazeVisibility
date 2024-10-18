@@ -26,6 +26,8 @@
 #include <FL/fl_draw.h>
 #include <GL/GL.h>
 
+#include <iostream>
+
 const char Maze::X = 0;
 const char Maze::Y = 1;
 const char Maze::Z = 2;
@@ -722,11 +724,11 @@ Draw_Map(int min_x, int min_y, int max_x, int max_y)
 //   THIS IS THE FUINCTION YOU SHOULD MODIFY.
 //======================================================================
 void Maze::
-Draw_View(const float focal_dist, const float aspect)
+Draw_View(const float aspect)
 //======================================================================
 {
 	frame_num++;
-
+	std::cout << "Frame number: " << frame_num << std::endl;
 	//###################################################################
 	// TODO
 	// The rest is up to you!

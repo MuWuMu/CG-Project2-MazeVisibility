@@ -96,7 +96,7 @@ class Maze {
 
 		// Draws the first-person view of the maze. It is passed the focal distance.
 		// THIS IS THE FUINCTION YOU SHOULD MODIFY.
-		void	Draw_View(const float, const float);
+		void	Draw_View(const float);
 
 		void	Draw_Wall(const float*, const float*, const float*, const float*, const float*);
 
