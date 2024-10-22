@@ -570,6 +570,76 @@ void Maze::NDC(float edge[4][4], const float start[2], const float end[2], const
 	}
 }
 
+void Maze::getInterSectionPoint(std::array<float, 2> &readyToPush, std::array<float, 2> start, std::array<float, 2> end, float frustStart[2], float frustEnd[2])
+{
+	float x1 = frustStart[X], y1 = frustStart[Y];
+	float x2 = frustEnd[X], y2 = frustEnd[Y];
+	float x3 = start[X], y3 = start[Y];
+	float x4 = end[X], y4 = end[Y];
+
+	readyToPush[X] = ((x1 * y2 - y1 * x2) * (x3 - x4) - (x1 - x2) * (x3 * y4 - y3 * x4)) /
+						((x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4));
+	readyToPush[Y] = ((x1 * y2 - y1 * x2) * (y3 - y4) - (y1 - y2) * (x3 * y4 - y3 * x4)) /
+						((x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4));
+}
+
+std::vector<std::array<float, 2>> Maze::Clipping(float edge[4][4])
+{
+	// Frustum points
+	const float POSITIVE = 0.5f; const float NEGATIVE = -0.5f;
+	const float FRUSTUM_EDGES[4][2] = { { POSITIVE, POSITIVE } , { POSITIVE, NEGATIVE }, { NEGATIVE, NEGATIVE }, { NEGATIVE, POSITIVE } };
+
+	std::vector<std::array<float, 2>> edgesClippedLastTime;
+	for (int i = 0; i < 4; i++) 
+	{
+		std::array<float, 2> tmp = { edge[i][X], edge[i][Y] };
+		edgesClippedLastTime.push_back(tmp);
+	}
+	
+	for (int frustIt = 0; frustIt < 4; frustIt++) 
+	{
+		std::vector<std::array<float, 2>> clippedEdges;	// store the clipped edges which clipped by this one frustum edge
+		for (int wallEdgeIt = 0; wallEdgeIt < edgesClippedLastTime.size(); wallEdgeIt++) 
+		{
+			float frustStart[2] = { FRUSTUM_EDGES[frustIt][X], FRUSTUM_EDGES[frustIt][Y] };
+			float frustEnd[2] = { FRUSTUM_EDGES[(frustIt + 1) % 4][X], FRUSTUM_EDGES[(frustIt + 1) % 4][Y] };
+
+			// discriminant, d = (x2 - x1)(y - y1) - (y2 - y1)(x - x1)
+			// if d < 0, the point is on the right side of the line (in the frustum)
+			// if d > 0, the point is on the left side of the line (out of the frustum)
+			// if d = 0, the point is on the line
+			float d1 = 
+				(frustEnd[X] - frustStart[X]) * (edgesClippedLastTime[wallEdgeIt][Y] - frustStart[Y]) - (frustEnd[Y] - frustStart[Y]) * ((edgesClippedLastTime[wallEdgeIt][X] - frustStart[X]));
+			float d2 = 
+				(frustEnd[X] - frustStart[X]) * (edgesClippedLastTime[(wallEdgeIt + 1) % edgesClippedLastTime.size()][Y] - frustStart[Y]) - (frustEnd[Y] - frustStart[Y]) * ((edgesClippedLastTime[(wallEdgeIt + 1) % edgesClippedLastTime.size()][X] - frustStart[X]));	
+			
+			// 4 cases
+			if (d1 <= 0 && d2 <= 0)			// in, in
+			{	// return start point
+				clippedEdges.push_back(edgesClippedLastTime[wallEdgeIt]);
+			} else if (d1 > 0 && d2 > 0)	// out, out
+			{	// return nothing
+
+			} else if (d1 <= 0 && d2 > 0)	// in, out
+			{	// return start point and intersection point
+				clippedEdges.push_back(edgesClippedLastTime[wallEdgeIt]);
+				std::array<float, 2> readyToPush;
+				getInterSectionPoint(readyToPush, edgesClippedLastTime[wallEdgeIt], edgesClippedLastTime[(wallEdgeIt + 1) % edgesClippedLastTime.size()], frustStart, frustEnd);
+				clippedEdges.push_back(readyToPush);
+			} else if (d1 > 0 && d2 <= 0)	// out, in
+			{	// return intersection
+				std::array<float, 2> readyToPush;
+				getInterSectionPoint(readyToPush, edgesClippedLastTime[wallEdgeIt], edgesClippedLastTime[(wallEdgeIt + 1) % edgesClippedLastTime.size()], frustStart, frustEnd);
+				clippedEdges.push_back(readyToPush);
+			}
+		}
+		edgesClippedLastTime = clippedEdges;
+		clippedEdges.clear();
+	}
+
+	return edgesClippedLastTime;
+}
+
 //**********************************************************************
 //
 // * Move the viewer's position. This method will do collision detection
@@ -728,7 +798,7 @@ Draw_View(const float aspect)
 //======================================================================
 {
 	frame_num++;
-	std::cout << "Frame number: " << frame_num << std::endl;
+	// std::cout << "Frame number: " << frame_num << std::endl;
 	//###################################################################
 	// TODO
 	// The rest is up to you!
@@ -769,18 +839,15 @@ Draw_Wall(const float start[2], const float end[2], const float color[3], const 
 	};
 
 	NDC(edge, start, end, color, modelView, projection);
+
+	std::vector<std::array<float, 2>> clippedEdge = Clipping(edge);
 	
-
-
-
-
-
 	glBegin(GL_POLYGON);
 	glColor3fv(color);
-	glVertex2f(edge[0][X], edge[0][Y]);
-	glVertex2f(edge[1][X], edge[1][Y]);
-	glVertex2f(edge[2][X], edge[2][Y]);
-	glVertex2f(edge[3][X], edge[3][Y]);
+	for (int i = 0; i < clippedEdge.size(); i++)
+	{
+		glVertex2f(clippedEdge[i][X], clippedEdge[i][Y]);
+	}
 	glEnd();
 
 

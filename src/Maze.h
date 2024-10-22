@@ -22,6 +22,9 @@
 #include <FL/math.h> // Use FLTK's math header because it defines M_PI
 #include "Cell.h"
 
+#include <vector>
+#include <array>
+
 //************************************************************************
 //
 // * A class for exceptions. Used by the constructor to pass file I/O errors
@@ -121,6 +124,8 @@ class Maze {
 		float*	LookAt(void);
 		float*	Perspective(const float wOverh);
 		void    NDC(float[4][4], const float*, const float*, const float*, const float*, const float*);
+		void	getInterSectionPoint(std::array<float, 2> &readyToPush, std::array<float, 2> start, std::array<float, 2> end, float frustStart[2], float frustEnd[2]);
+		std::vector<std::array<float, 2>> 	Clipping(float edge[4][4]);
 
 	private:
 		Cell				*view_cell;// The cell that currently contains the view
