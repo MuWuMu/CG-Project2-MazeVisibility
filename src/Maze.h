@@ -126,6 +126,9 @@ class Maze {
 		void    NDC(float[4][4], const float*, const float*, const float*, const float*, const float*);
 		void	getInterSectionPoint(std::array<float, 2> &readyToPush, std::array<float, 2> start, std::array<float, 2> end, float frustStart[2], float frustEnd[2]);
 		std::vector<std::array<float, 2>> 	Clipping(float edge[4][4]);
+		void    ClipIn2D(float wall_start[2], float wall_end[2], float frustum_edge[2][2], float color[3]);
+
+		void	Draw_Cell(Cell* targetCell, const float LPoint[2], const float RPoint[2]);
 
 	private:
 		Cell				*view_cell;// The cell that currently contains the view

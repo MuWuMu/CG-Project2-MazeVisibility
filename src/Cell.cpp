@@ -136,7 +136,7 @@ Clip_To_Cell(float &xs, float &ys,
 		}
 	}
 
+	
+
 	return NULL;
 }
-
-
