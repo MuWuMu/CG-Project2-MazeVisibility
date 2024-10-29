@@ -42,6 +42,8 @@ Cell(int i, Edge *px, Edge *py, Edge *mx, Edge *my)
 	edges[MINUS_Y] = my;
 
 	counter = 0;
+
+	footprint = false;
 }
 
 

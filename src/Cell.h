@@ -50,6 +50,8 @@ class Cell {
     static const char	MINUS_X;        // The edge in the negative x direction
     static const char	MINUS_Y;        // The edge in the negative y direction
 
+	bool	footprint;
+
     int		index;		// The index of this cell (just an identifier).
     Edge		*edges[4];  // Pointers to the edges of the cell.
 

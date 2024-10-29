@@ -537,10 +537,10 @@ float *Maze::Perspective(const float wOverh)
 	// Perspective
 	float fovy = viewer_fov;
 	float aspect = wOverh;
-	float zNear = 0.01;
+	float zNear = 1;
 	float zFar = 200;
 
-	float f = 1.0f / tanf(fovy * 0.5f * (M_PI / 180.0f)); // calc cotangent
+	float f = 1.0f / tanf(To_Radians(fovy * 0.5f)); // calc cotangent
 
 	float perspective[16] = {
 		f / aspect, 0.0f, 0.0f, 0.0f,
@@ -554,7 +554,25 @@ float *Maze::Perspective(const float wOverh)
 	return perspective;
 }
 
-void Maze::NDC(float edge[4][4], const float start[2], const float end[2], const float color[3], const float modelView[16], const float projection[16])
+float* Maze::MVP(const float* modelView, const float* projection)
+{
+	float MVP[16] = {0.0f};
+
+	for (int i = 0; i <= 3; i++)
+	{
+		for (int j = 0; j <= 3; j++)
+		{
+			for (int k = 0; k <= 3; k++)
+			{
+				MVP[k * 4 + i] += modelView[k * 4 + j] * projection[j * 4 + i];
+			}
+		}
+	}
+
+	return MVP;
+}
+
+void Maze::NDC(float edge[4][4], const float* MVP)
 {
 	float tmp[4][4] = {0.0f};
 
@@ -564,28 +582,11 @@ void Maze::NDC(float edge[4][4], const float start[2], const float end[2], const
 		{
 			for (int k = 0; k <= 3; k++)
 			{
-				tmp[k][i] += edge[k][j] * modelView[j * 4 + i];
+				tmp[k][i] += edge[k][j] * MVP[j * 4 + i];
 			}
-		}
-	}
-	for (int i = 0; i <= 3; i++)
-	{
-		for (int k = 0; k <= 3; k++)
-		{
-			edge[k][i] = tmp[k][i];
 		}
 	}
 
-	for (int i = 0; i <= 3; i++)
-	{
-		for (int j = 0; j <= 3; j++)
-		{
-			for (int k = 0; k <= 3; k++)
-			{
-				tmp[k][i] += edge[k][j] * projection[j * 4 + i];
-			}
-		}
-	}
 	for (int i = 0; i <= 3; i++)
 	{
 		for (int k = 0; k <= 3; k++)
@@ -676,12 +677,155 @@ std::vector<std::array<float, 2>> Maze::Clipping(float edge[4][4])
 	return edgesClippedLastTime;
 }
 
-void Maze::ClipIn2D(float wall_start[2], float wall_end[2], float frustum_edge[2][2], float color[3])
+void Maze::Draw_Cell(Cell *targetCell, const float LPoint[2], const float RPoint[2], float aspect, const float MVP[16])
 {
-}
+	targetCell->footprint = true;
 
-void Maze::Draw_Cell(Cell *targetCell, const float LPoint[2], const float RPoint[2])
-{
+	float newLPoint[2] = {LPoint[X], LPoint[Y]};
+	float newRPoint[2] = {RPoint[X], RPoint[Y]};
+	
+	for (int i = 0; i < 4; i++)
+	{
+		// clip the current edge
+		float edge_start[2] = {
+			targetCell->edges[i]->endpoints[Edge::START]->posn[Vertex::X],
+			targetCell->edges[i]->endpoints[Edge::START]->posn[Vertex::Y]};
+		float edge_end[2] = {
+			targetCell->edges[i]->endpoints[Edge::END]->posn[Vertex::X],
+			targetCell->edges[i]->endpoints[Edge::END]->posn[Vertex::Y]};
+
+		// Clipping the edge with the right line
+		//======================================================================
+		float d1 = (viewer_posn[X] - RPoint[X]) * (edge_start[Y] - RPoint[Y]) -
+				   (viewer_posn[Y] - RPoint[Y]) * (edge_start[X] - RPoint[X]);
+		float d2 = (viewer_posn[X] - RPoint[X]) * (edge_end[Y] - RPoint[Y]) -
+				   (viewer_posn[Y] - RPoint[Y]) * (edge_end[X] - RPoint[X]);
+
+		if (d1 <= 0 && d2 <= 0)
+		{
+			// Both points are on the right side, keep the entire edge
+			// Do nothing
+		}
+		else if (d1 > 0 && d2 > 0)
+		{
+			// Both points are on the left side, skip the entire edge
+			// Not drawing the edge
+			continue;
+		}
+		else
+		{
+			// One point is on the right side, one point is on the left side
+			// Calculate the intersection point
+			float intersection[2] = {
+				(((RPoint[X] * viewer_posn[Y] - RPoint[Y] * viewer_posn[X]) * (edge_start[X] - edge_end[X]) -
+				  (RPoint[X] - viewer_posn[X]) * (edge_start[X] * edge_end[Y] - edge_start[Y] * edge_end[X])) /
+				 ((RPoint[X] - viewer_posn[X]) * (edge_start[Y] - edge_end[Y]) -
+				  (RPoint[Y] - viewer_posn[Y]) * (edge_start[X] - edge_end[X]))),
+
+				(((RPoint[X] * viewer_posn[Y] - RPoint[Y] * viewer_posn[X]) * (edge_start[Y] - edge_end[Y]) -
+				  (RPoint[Y] - viewer_posn[Y]) * (edge_start[X] * edge_end[Y] - edge_start[Y] * edge_end[X])) /
+				 ((RPoint[X] - viewer_posn[X]) * (edge_start[Y] - edge_end[Y]) -
+				  (RPoint[Y] - viewer_posn[Y]) * (edge_start[X] - edge_end[X])))};
+
+			if (d1 <= 0)
+			{
+				// edge_start is on the right side, no need to update, in order, update edge_end
+				edge_end[0] = intersection[0];
+				edge_end[1] = intersection[1];
+			}
+			else
+			{
+				// edge_end is on the right side, no need to update, in order, update edge_start
+				edge_start[0] = intersection[0];
+				edge_start[1] = intersection[1];
+			}
+		}
+
+		// Clipping the edge with the left line
+		//======================================================================
+		d1 = (LPoint[X] - viewer_posn[X]) * (edge_start[Y] - viewer_posn[Y]) -
+			 (LPoint[Y] - viewer_posn[Y]) * (edge_start[X] - viewer_posn[X]);
+		d2 = (LPoint[X] - viewer_posn[X]) * (edge_end[Y] - viewer_posn[Y]) -
+			 (LPoint[Y] - viewer_posn[Y]) * (edge_end[X] - viewer_posn[X]);
+
+		if (d1 <= 0 && d2 <= 0)
+		{
+			// Both points are on the right side, keep the entire edge
+			// Do nothing
+		}
+		else if (d1 > 0 && d2 > 0)
+		{
+			// Both points are on the left side, skip the entire edge
+			// Not drawing the edge
+			continue;
+		}
+		else
+		{
+			// One point is on the right side, one point is on the left side
+			// Calculate the intersection point
+			float intersection[2] = {
+				(((viewer_posn[X] * LPoint[Y] - viewer_posn[Y] * LPoint[X]) * (edge_start[X] - edge_end[X]) -
+				  (viewer_posn[X] - LPoint[X]) * (edge_start[X] * edge_end[Y] - edge_start[Y] * edge_end[X])) /
+				 ((viewer_posn[X] - LPoint[X]) * (edge_start[Y] - edge_end[Y]) -
+				  (viewer_posn[Y] - LPoint[Y]) * (edge_start[X] - edge_end[X]))),
+
+				(((viewer_posn[X] * LPoint[Y] - viewer_posn[Y] * LPoint[X]) * (edge_start[Y] - edge_end[Y]) -
+				  (viewer_posn[Y] - LPoint[Y]) * (edge_start[X] * edge_end[Y] - edge_start[Y] * edge_end[X])) /
+				 ((viewer_posn[X] - LPoint[X]) * (edge_start[Y] - edge_end[Y]) -
+				  (viewer_posn[Y] - LPoint[Y]) * (edge_start[X] - edge_end[X])))};
+
+			if (d1 <= 0)
+			{
+				// edge_start is on the right side, no need to update, in order, update edge_end
+				edge_end[0] = intersection[0];
+				edge_end[1] = intersection[1];
+			}
+			else
+			{
+				// edge_end is on the right side, no need to update, in order, update edge_start
+				edge_start[0] = intersection[0];
+				edge_start[1] = intersection[1];
+			}
+		}
+		// Check which is the left point and which is the right point
+		//vector from viewer to edge_start
+		float vStart[2] = {edge_start[X] - viewer_posn[X], edge_start[Y] - viewer_posn[Y]};
+		//vector from viewer to edge_end
+		float vEnd[2] = {edge_end[X] - viewer_posn[X], edge_end[Y] - viewer_posn[Y]};
+		//cross product
+		float cross = vStart[X] * vEnd[Y] - vStart[Y] * vEnd[X];
+		//if cross product is positive, edge_end is on the left side of edge_start
+		if (cross > 0)
+		{
+			newLPoint[X] = edge_end[X];
+			newLPoint[Y] = edge_end[Y];
+			newRPoint[X] = edge_start[X];
+			newRPoint[Y] = edge_start[Y];
+		}
+		else
+		{
+			newLPoint[X] = edge_start[X];
+			newLPoint[Y] = edge_start[Y];
+			newRPoint[X] = edge_end[X];
+			newRPoint[Y] = edge_end[Y];
+		}
+
+
+		if (targetCell->edges[i]->opaque)
+		{
+			Draw_Wall(edge_start, edge_end, targetCell->edges[i]->color, MVP);
+		}
+		else
+		{
+			if (!(targetCell->edges[i]->Neighbor(targetCell)->footprint))
+			{
+				std::cout << "Draw_Cell" << std::endl;
+				std::cout << newLPoint[0] << " " << newLPoint[1] << std::endl;
+				std::cout << newRPoint[0] << " " << newRPoint[1] << std::endl;
+				Draw_Cell(targetCell->edges[i]->Neighbor(targetCell), newLPoint, newRPoint, aspect, MVP);
+			}
+		}
+	}
 }
 
 //**********************************************************************
@@ -839,9 +983,17 @@ void Maze::
 //======================================================================
 {
 	frame_num++;
-	// std::cout << "Frame number: " << frame_num << std::endl;
+	std::cout << "Frame number: " << frame_num << std::endl;
 
-	glClear(GL_DEPTH_BUFFER_BIT);
+	// Set up the modelview and projection matrix.
+	const float* modelView = this->LookAt();
+	const float* projection = this->Perspective(aspect);
+	// MVP
+	const float* MVP = this->MVP(modelView, projection);
+
+	for (int i = 0; i < num_cells; i++)
+		this->cells[i]->footprint = false;
+
 
 	float half_fov_rad = To_Radians(viewer_fov) * 0.5f;
 	float right_dir = To_Radians(viewer_dir) - half_fov_rad;
@@ -855,145 +1007,11 @@ void Maze::
 	float left_line_start[2] = {viewer_posn[X], viewer_posn[Y]};
 	float left_line_end[2] = {viewer_posn[X] + left_dir_vector[X], viewer_posn[Y] + left_dir_vector[Y]};
 
-	for (int i = 0; i < (int)this->num_edges; i++)
-	{
-		if (!this->edges[i]->opaque)
-			continue;
-
-		float edge_start[2] = {
-			this->edges[i]->endpoints[Edge::START]->posn[Vertex::X],
-			this->edges[i]->endpoints[Edge::START]->posn[Vertex::Y]};
-		float edge_end[2] = {
-			this->edges[i]->endpoints[Edge::END]->posn[Vertex::X],
-			this->edges[i]->endpoints[Edge::END]->posn[Vertex::Y]};
-
-		
-		// Clipping the edge with the right line
-		//======================================================================
-		float d1 = (right_line_end[X] - right_line_start[X]) * (edge_start[Y] - right_line_start[Y]) -
-				   (right_line_end[Y] - right_line_start[Y]) * (edge_start[X] - right_line_start[X]);
-		float d2 = (right_line_end[X] - right_line_start[X]) * (edge_end[Y] - right_line_start[Y]) -
-				   (right_line_end[Y] - right_line_start[Y]) * (edge_end[X] - right_line_start[X]);
-
-		if (d1 <= 0 && d2 <= 0)
-		{
-			// Both points are on the right side, keep the entire edge
-			// Do nothing
-		}
-		else if (d1 > 0 && d2 > 0)
-		{
-			// Both points are on the left side, skip the entire edge
-			// Not drawing the edge
-			continue;
-		}
-		else
-		{
-			// One point is on the right side, one point is on the left side
-			// Calculate the intersection point
-			float intersection[2] = {
-				(((right_line_start[X] * right_line_end[Y] - right_line_start[Y] * right_line_end[X]) * (edge_start[X] - edge_end[X]) - 
-				(right_line_start[X] - right_line_end[X]) * (edge_start[X] * edge_end[Y] - edge_start[Y] * edge_end[X])) /
-				((right_line_start[X] - right_line_end[X]) * (edge_start[Y] - edge_end[Y]) -
-				(right_line_start[Y] - right_line_end[Y]) * (edge_start[X] - edge_end[X]))),
-
-				(((right_line_start[X] * right_line_end[Y] - right_line_start[Y] * right_line_end[X]) * (edge_start[Y] - edge_end[Y]) -
-				(right_line_start[Y] - right_line_end[Y]) * (edge_start[X] * edge_end[Y] - edge_start[Y] * edge_end[X])) /
-				((right_line_start[X] - right_line_end[X]) * (edge_start[Y] - edge_end[Y]) -
-				(right_line_start[Y] - right_line_end[Y]) * (edge_start[X] - edge_end[X])))
-				};
-
-			if (d1 < 0)
-			{
-				// edge_start is on the right side, no need to update, in order, update edge_end
-				edge_end[0] = intersection[0];
-				edge_end[1] = intersection[1];
-			}
-			else
-			{
-				// edge_end is on the right side, no need to update, in order, update edge_start
-				edge_start[0] = intersection[0];
-				edge_start[1] = intersection[1];
-			}
-		}
-
-
-		// Clipping the edge with the left line
-		//======================================================================
-		d1 = (left_line_end[X] - left_line_start[X]) * (edge_start[Y] - left_line_start[Y]) -
-			 (left_line_end[Y] - left_line_start[Y]) * (edge_start[X] - left_line_start[X]);
-		d2 = (left_line_end[X] - left_line_start[X]) * (edge_end[Y] - left_line_start[Y]) -
-			 (left_line_end[Y] - left_line_start[Y]) * (edge_end[X] - left_line_start[X]);
-
-		if (d1 <= 0 && d2 <= 0)
-		{
-			// Both points are on the right side, keep the entire edge
-			// Do nothing
-		}
-		else if (d1 > 0 && d2 > 0)
-		{
-			// Both points are on the left side, skip the entire edge
-			// Not drawing the edge
-			continue;
-		}
-		else
-		{
-			// One point is on the right side, one point is on the left side
-			// Calculate the intersection point
-			float intersection[2] = {
-				(((left_line_start[X] * left_line_end[Y] - left_line_start[Y] * left_line_end[X]) * (edge_start[X] - edge_end[X]) - 
-				(left_line_start[X] - left_line_end[X]) * (edge_start[X] * edge_end[Y] - edge_start[Y] * edge_end[X])) /
-				((left_line_start[X] - left_line_end[X]) * (edge_start[Y] - edge_end[Y]) -
-				(left_line_start[Y] - left_line_end[Y]) * (edge_start[X] - edge_end[X]))),
-
-				(((left_line_start[X] * left_line_end[Y] - left_line_start[Y] * left_line_end[X]) * (edge_start[Y] - edge_end[Y]) -
-				(left_line_start[Y] - left_line_end[Y]) * (edge_start[X] * edge_end[Y] - edge_start[Y] * edge_end[X])) /
-				((left_line_start[X] - left_line_end[X]) * (edge_start[Y] - edge_end[Y]) -
-				(left_line_start[Y] - left_line_end[Y]) * (edge_start[X] - edge_end[X])))
-				};
-
-			if (d1 < 0)
-			{
-				// edge_start is on the right side, no need to update, in order, update edge_end
-				edge_end[0] = intersection[0];
-				edge_end[1] = intersection[1];
-			}
-			else
-			{
-				// edge_end is on the right side, no need to update, in order, update edge_start
-				edge_start[0] = intersection[0];
-				edge_start[1] = intersection[1];
-			}
-		}
-
-
-		Draw_Wall(edge_start, edge_end, this->edges[i]->color, this->LookAt(), this->Perspective(aspect));
-	}
-
-	// // glEnable(GL_DEPTH_TEST);
-	// for (int i = 0; i < (int)this->num_edges; i++)
-	// {
-	// 	float edge_start[2] = {
-	// 		this->edges[i]->endpoints[Edge::START]->posn[Vertex::X],
-	// 		this->edges[i]->endpoints[Edge::START]->posn[Vertex::Y]};
-	// 	float edge_end[2] = {
-	// 		this->edges[i]->endpoints[Edge::END]->posn[Vertex::X],
-	// 		this->edges[i]->endpoints[Edge::END]->posn[Vertex::Y]};
-
-	// 	float color[3] = {this->edges[i]->color[0], this->edges[i]->color[1], this->edges[i]->color[2]};
-
-	// 	if (this->edges[i]->opaque)
-	// 	{
-	// 		Draw_Wall(edge_start, edge_end, color, this->LookAt(), this->Perspective(aspect));
-	// 	}
-	// }
-
-	// remove the for loop above
-	// do the clipping
-	// and draw the wall with the clipped edges
+	Draw_Cell(view_cell, left_line_end, right_line_start, aspect, MVP);
 }
 
 void Maze::
-	Draw_Wall(const float start[2], const float end[2], const float color[3], const float modelView[16], const float projection[16])
+	Draw_Wall(const float start[2], const float end[2], const float color[3], const float MVP[16])
 {
 	float edge[4][4] = {
 		{start[Y], 1.0f, start[X], 1.0f},
@@ -1001,7 +1019,7 @@ void Maze::
 		{end[Y], -1.0f, end[X], 1.0f},
 		{start[Y], -1.0f, start[X], 1.0f}};
 
-	NDC(edge, start, end, color, modelView, projection);
+	NDC(edge, MVP);
 
 	glBegin(GL_POLYGON);
 	glColor3fv(color);
@@ -1010,17 +1028,6 @@ void Maze::
 		glVertex2f(edge[i][X], edge[i][Y]);
 	}
 	glEnd();
-
-
-	// std::vector<std::array<float, 2>> clippedEdge = Clipping(edge);
-
-	// glBegin(GL_POLYGON);
-	// glColor3fv(color);
-	// for (int i = 0; i < clippedEdge.size(); i++)
-	// {
-	// 	glVertex2f(clippedEdge[i][X], clippedEdge[i][Y]);
-	// }
-	// glEnd();
 }
 
 //**********************************************************************

@@ -101,7 +101,7 @@ class Maze {
 		// THIS IS THE FUINCTION YOU SHOULD MODIFY.
 		void	Draw_View(const float);
 
-		void	Draw_Wall(const float*, const float*, const float*, const float*, const float*);
+		void	Draw_Wall(const float* start, const float* end, const float* color, const float* MVP);
 
 		// Save the maze to a file of the given name.
 		bool	Save(const char*);
@@ -123,12 +123,13 @@ class Maze {
 
 		float*	LookAt(void);
 		float*	Perspective(const float wOverh);
-		void    NDC(float[4][4], const float*, const float*, const float*, const float*, const float*);
+		float*	MVP(const float* modelView, const float* projection);
+		void    NDC(float[4][4], const float* MVP);
 		void	getInterSectionPoint(std::array<float, 2> &readyToPush, std::array<float, 2> start, std::array<float, 2> end, float frustStart[2], float frustEnd[2]);
 		std::vector<std::array<float, 2>> 	Clipping(float edge[4][4]);
-		void    ClipIn2D(float wall_start[2], float wall_end[2], float frustum_edge[2][2], float color[3]);
 
-		void	Draw_Cell(Cell* targetCell, const float LPoint[2], const float RPoint[2]);
+		void	Draw_Cell(Cell* targetCell, const float LPoint[2], const float RPoint[2], float aspect, const float MVP[16]);
+
 
 	private:
 		Cell				*view_cell;// The cell that currently contains the view
