@@ -554,7 +554,7 @@ float *Maze::Perspective(const float wOverh)
 	return perspective;
 }
 
-float* Maze::MVP(const float* modelView, const float* projection)
+float *Maze::MVP(const float *modelView, const float *projection)
 {
 	float MVP[16] = {0.0f};
 
@@ -572,7 +572,7 @@ float* Maze::MVP(const float* modelView, const float* projection)
 	return MVP;
 }
 
-void Maze::NDC(float edge[4][4], const float* MVP)
+void Maze::NDC(float edge[4][4], const float *MVP)
 {
 	float tmp[4][4] = {0.0f};
 
@@ -681,9 +681,10 @@ void Maze::Draw_Cell(Cell *targetCell, const float LPoint[2], const float RPoint
 {
 	targetCell->footprint = true;
 
+	// The new clipped point for the later frustum
 	float newLPoint[2] = {LPoint[X], LPoint[Y]};
 	float newRPoint[2] = {RPoint[X], RPoint[Y]};
-	
+
 	for (int i = 0; i < 4; i++)
 	{
 		// clip the current edge
@@ -787,14 +788,15 @@ void Maze::Draw_Cell(Cell *targetCell, const float LPoint[2], const float RPoint
 				edge_start[1] = intersection[1];
 			}
 		}
+
 		// Check which is the left point and which is the right point
-		//vector from viewer to edge_start
+		// vector from viewer to edge_start
 		float vStart[2] = {edge_start[X] - viewer_posn[X], edge_start[Y] - viewer_posn[Y]};
-		//vector from viewer to edge_end
+		// vector from viewer to edge_end
 		float vEnd[2] = {edge_end[X] - viewer_posn[X], edge_end[Y] - viewer_posn[Y]};
-		//cross product
+		// cross product
 		float cross = vStart[X] * vEnd[Y] - vStart[Y] * vEnd[X];
-		//if cross product is positive, edge_end is on the left side of edge_start
+		// if cross product is positive, edge_end is on the left side of edge_start
 		if (cross > 0)
 		{
 			newLPoint[X] = edge_end[X];
@@ -810,7 +812,6 @@ void Maze::Draw_Cell(Cell *targetCell, const float LPoint[2], const float RPoint
 			newRPoint[Y] = edge_end[Y];
 		}
 
-
 		if (targetCell->edges[i]->opaque)
 		{
 			Draw_Wall(edge_start, edge_end, targetCell->edges[i]->color, MVP);
@@ -819,9 +820,6 @@ void Maze::Draw_Cell(Cell *targetCell, const float LPoint[2], const float RPoint
 		{
 			if (!(targetCell->edges[i]->Neighbor(targetCell)->footprint))
 			{
-				std::cout << "Draw_Cell" << std::endl;
-				std::cout << newLPoint[0] << " " << newLPoint[1] << std::endl;
-				std::cout << newRPoint[0] << " " << newRPoint[1] << std::endl;
 				Draw_Cell(targetCell->edges[i]->Neighbor(targetCell), newLPoint, newRPoint, aspect, MVP);
 			}
 		}
@@ -986,27 +984,31 @@ void Maze::
 	std::cout << "Frame number: " << frame_num << std::endl;
 
 	// Set up the modelview and projection matrix.
-	const float* modelView = this->LookAt();
-	const float* projection = this->Perspective(aspect);
+	const float *modelView = this->LookAt();
+	const float *projection = this->Perspective(aspect);
 	// MVP
-	const float* MVP = this->MVP(modelView, projection);
+	const float *MVP = this->MVP(modelView, projection);
 
+	// Initialize the footprint of all cells in the beginning of each frame
 	for (int i = 0; i < num_cells; i++)
 		this->cells[i]->footprint = false;
 
-
+	// Right and left derection angle
 	float half_fov_rad = To_Radians(viewer_fov) * 0.5f;
 	float right_dir = To_Radians(viewer_dir) - half_fov_rad;
 	float left_dir = To_Radians(viewer_dir) + half_fov_rad;
 
+	// Right and left direction vector
 	float right_dir_vector[2] = {cos(right_dir), sin(right_dir)};
 	float left_dir_vector[2] = {cos(left_dir), sin(left_dir)};
 
+	// Right and left line
 	float right_line_end[2] = {viewer_posn[X], viewer_posn[Y]};
 	float right_line_start[2] = {viewer_posn[X] + right_dir_vector[X], viewer_posn[Y] + right_dir_vector[Y]};
 	float left_line_start[2] = {viewer_posn[X], viewer_posn[Y]};
 	float left_line_end[2] = {viewer_posn[X] + left_dir_vector[X], viewer_posn[Y] + left_dir_vector[Y]};
 
+	// Recursively draw the cells
 	Draw_Cell(view_cell, left_line_end, right_line_start, aspect, MVP);
 }
 
@@ -1024,9 +1026,7 @@ void Maze::
 	glBegin(GL_POLYGON);
 	glColor3fv(color);
 	for (int i = 0; i < 4; i++)
-	{
 		glVertex2f(edge[i][X], edge[i][Y]);
-	}
 	glEnd();
 }
 
